@@ -5,6 +5,7 @@ Display the song you are currently playing on Spotify on a 64x32 LED matrix usin
     <img src="https://github.com/upedd/circuitpy-spotify-matrix/blob/main/images/photo1.jpg?raw=true" width="400"/>
     <img src="https://github.com/upedd/circuitpy-spotify-matrix/blob/main/images/photo2.jpg?raw=true" width="400"/>
 </p>
+
 ## Features
 - Displays the title and artist(s) of the song.
 - Shows scaled-down, colorful cover art.
