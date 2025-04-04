@@ -130,10 +130,16 @@ class Display:
     progress_secondary_color = 0x18181b
     progress_width = 28
 
+
     def __init__(self):
         self.enabled = False
         self.has_error = False
         displayio.release_displays()
+        
+        base_color = 0xFFFFFF
+        # Adjust the color using the brightness factor
+        adjusted_color = self.adjust_brightness(base_color, 0.1)
+        
         # Customize here!
         matrix = rgbmatrix.RGBMatrix(
             width=64, height=32, bit_depth=5,
@@ -148,13 +154,13 @@ class Display:
 
         self.line1 = adafruit_display_text.label.Label(
             roboto_7pt,
-            color=0xf9fafb)
+            color=adjusted_color)
         self.line1.x = self.display.width
         self.line1.y = self.line1_y
 
         self.line2 = adafruit_display_text.label.Label(
             roboto_5pt,
-            color=0x3f3f46
+            color=adjusted_color
         )
         self.line2.x = self.display.width
         self.line2.y = self.line2_y
@@ -178,6 +184,25 @@ class Display:
         self.display_group.append(progress_tile_grid)
 
         self.jpeg_decoder = JpegDecoder()
+        
+    def adjust_brightness(self, hex_color, factor):
+        # Extract RGB components from the hex color
+        r = (hex_color >> 16) & 0xFF
+        g = (hex_color >> 8) & 0xFF
+        b = hex_color & 0xFF
+
+        # Adjust the brightness by multiplying each component by the factor
+        r = int(r * factor)
+        g = int(g * factor)
+        b = int(b * factor)
+
+        # Ensure the values stay within the valid RGB range (0-255)
+        r = min(max(r, 0), 255)
+        g = min(max(g, 0), 255)
+        b = min(max(b, 0), 255)
+
+        # Return the new color as a hex value
+        return (r << 16) | (g << 8) | b    
 
     def show_error(self, msg):
         self.enable()
@@ -186,12 +211,44 @@ class Display:
         self.line1.color = 0xFF0000
         self.line2.text = msg
         self.line2.color = 0xFF0000
-        
+
+    
     def load_image_from_url(self, url):
         gc.collect()
         response = requests.get(url)
         self.jpeg_decoder.open(response.content)
         self.jpeg_decoder.decode(self.image_bitmap, 1) # Assumes the image we fetched is 64x64 and downscales it by 2^1 to 32x32
+        
+        brightness_factor = 0.3
+        width = self.image_bitmap.width
+        height = self.image_bitmap.height
+
+        for y in range(height):
+            for x in range(width):
+                # Get the pixel value in RGB565 format
+                pixel_value = self.image_bitmap[x, y]
+
+                # Convert RGB565 to RGB888 (inline implementation of rgb565_swapped_to_rgb888)
+                # Swap bytes (for little-endian data from CircuitPython)
+                swapped = ((pixel_value & 0xFF) << 8) | ((pixel_value >> 8) & 0xFF)
+                # Extract RGB components
+                r = ((swapped >> 11) & 0x1F) * 255 // 31
+                g = ((swapped >> 5) & 0x3F) * 255 // 63
+                b = (swapped & 0x1F) * 255 // 31
+
+                # Apply brightness reduction
+                r = int(r * brightness_factor)
+                g = int(g * brightness_factor)
+                b = int(b * brightness_factor)
+
+                # Convert back to RGB565
+                dimmed_pixel_value = ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3)
+
+                # Swap bytes back to RGB565 swapped format
+                dimmed_pixel_value_swapped = ((dimmed_pixel_value & 0xFF) << 8) | ((dimmed_pixel_value >> 8) & 0xFF)
+
+                # Update the pixel in the bitmap
+                self.image_bitmap[x, y] = dimmed_pixel_value_swapped
 
     def scroll(self, line):
         line.x = line.x - 1
